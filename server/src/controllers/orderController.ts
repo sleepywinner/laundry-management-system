@@ -1,3 +1,4 @@
+import { io } from "../index";
 import { Request, Response } from "express";
 import Order from "../models/Order";
 import { AuthRequest } from "../middleware/authMiddleware";
@@ -128,6 +129,20 @@ export const updateOrderStatus = async (
     }
 
     await order.save();
+
+    // Emit real-time update to customer
+    const populatedOrder = await Order.findById(order._id).populate(
+      "customer",
+      "name email",
+    );
+    if (populatedOrder) {
+      const customerId = (populatedOrder.customer as any)._id
+        ? (populatedOrder.customer as any)._id.toString()
+        : (populatedOrder.customer as any).toString();
+
+      io.to(customerId).emit("orderStatusUpdated", populatedOrder);
+      console.log(`📦 Order status updated: ${order._id} → ${status}`);
+    }
 
     res.status(200).json(order);
   } catch (error) {

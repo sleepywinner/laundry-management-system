@@ -2,6 +2,8 @@ import express, { Application, Request, Response } from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
+import { createServer } from "http";
+import { Server } from "socket.io";
 import authRoutes from "./routes/authRoutes";
 import orderRoutes from "./routes/orderRoutes";
 
@@ -10,6 +12,17 @@ dotenv.config();
 
 // Create express app
 const app: Application = express();
+
+// Create HTTP server
+const httpServer = createServer(app);
+
+// Create Socket.io server
+export const io = new Server(httpServer, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST", "PUT"],
+  },
+});
 
 // Middleware
 app.use(cors());
@@ -22,6 +35,22 @@ app.use("/api/orders", orderRoutes);
 // Test route
 app.get("/", (req: Request, res: Response) => {
   res.json({ message: "Laundry Management System API is running!" });
+});
+
+// Socket.io connection
+io.on("connection", (socket) => {
+  console.log(`⚡ Client connected: ${socket.id}`);
+
+  // Join a room based on user ID
+  socket.on("join", (userId: string) => {
+    socket.join(userId);
+    console.log(`👤 User ${userId} joined their room`);
+  });
+
+  // Disconnect
+  socket.on("disconnect", () => {
+    console.log(`❌ Client disconnected: ${socket.id}`);
+  });
 });
 
 // Database connection
@@ -41,8 +70,9 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async (): Promise<void> => {
   await connectDB();
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log(`🚀 Server is running on port ${PORT}`);
+    console.log(`⚡ Socket.io is ready!`);
   });
 };
 

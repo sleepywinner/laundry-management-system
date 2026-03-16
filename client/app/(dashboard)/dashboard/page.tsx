@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { AppDispatch, RootState } from "@/store";
 import { getMyOrders } from "@/store/slices/orderSlice";
 import { logout } from "@/store/slices/authSlice";
+import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
 import toast from "react-hot-toast";
+import { Order } from "@/types";
 
 export default function DashboardPage() {
   const dispatch = useDispatch<AppDispatch>();
@@ -19,11 +21,31 @@ export default function DashboardPage() {
       router.push("/login");
       return;
     }
+
+    // Fetch orders
     dispatch(getMyOrders());
+
+    // Connect socket
+    connectSocket(user._id);
+
+    // Listen for real-time order updates
+    const socket = getSocket();
+    socket.on("orderStatusUpdated", (updatedOrder: Order) => {
+      toast.success(
+        `Order #${updatedOrder._id.slice(-6).toUpperCase()} status updated to ${updatedOrder.status.replace("_", " ").toUpperCase()}! 🎉`,
+      );
+      dispatch(getMyOrders());
+    });
+
+    return () => {
+      socket.off("orderStatusUpdated");
+      disconnectSocket();
+    };
   }, [user, dispatch, router]);
 
   const handleLogout = () => {
     dispatch(logout());
+    disconnectSocket();
     toast.success("Logged out successfully!");
     router.push("/login");
   };
